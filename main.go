@@ -39,11 +39,9 @@ func run(cmd *cobra.Command, args []string) {
 		defer wg.Done()
 		defer close(files)
 
-		logger.Debug("begin walk")
 		if err := index.IndexFromWalk(logger, files, options.Cwd, options.SearchDir, options.Ignore, options.Match); err != nil {
 			logger.Fatal(err)
 		}
-		logger.Debug("finish walk")
 	}()
 
 	wg.Add(1)
@@ -51,21 +49,17 @@ func run(cmd *cobra.Command, args []string) {
 		defer wg.Done()
 		defer close(entities)
 
-		logger.Debug("begin parse")
 		if err := parse.Parser(logger, files, entities, options.Pattern); err != nil {
 			logger.Fatal(err)
 		}
-		logger.Debug("finish parse")
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
-		logger.Debug("begin submit")
 		if err := submit.Submitter(logger, entities, options.OutputFile, options.OutputEndpoint, options.DryRun); err != nil {
 			logger.Fatal(err)
 		}
-		logger.Debug("finish submit")
 	}()
 }

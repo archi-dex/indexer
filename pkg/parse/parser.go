@@ -43,11 +43,20 @@ func Parser(logger util.Logger, files <-chan string, entities chan<- Entity, pat
 	matcher := regexp.MustCompile(pattern)
 	names := matcher.SubexpNames()
 
+	total := 0
+	skipped := 0
+	defer func() { logger.Infow("parsing complete", "total", total, "skipped", skipped) }()
+
 	for filepath := range files {
+		total += 1
+
 		if entity := parse(logger, matcher, names, filepath); entity != nil {
 			logger.Debugw("parsed entity", "entity", entity)
 			entities <- *entity
+			continue
 		}
+
+		skipped += 1
 	}
 
 	return nil

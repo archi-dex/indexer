@@ -13,13 +13,21 @@ const (
 	fileMode  = 0644
 )
 
-func submitToFile(file *os.File, entity parse.Entity) {
-	str, _ := json.Marshal(entity)
+func submitToFile(file *os.File, entity parse.Entity) error {
+	str, err := json.Marshal(entity)
+	if err != nil {
+		return err
+	}
+
 	file.Write(str)
 	file.WriteString("\n")
+
+	return nil
 }
 
-func submitToEndpoint(endpoint string) {}
+func submitToEndpoint(endpoint string) error {
+	return nil
+}
 
 func Submitter(logger util.Logger, entities <-chan parse.Entity, outputFile, outputEndpoint string, dryrun bool) error {
 	if outputFile == "" && outputEndpoint == "" {
@@ -43,16 +51,25 @@ func Submitter(logger util.Logger, entities <-chan parse.Entity, outputFile, out
 		}
 	}
 
+	errors := 0
+	defer func() { logger.Infow("submission completed", "errors", errors) }()
+
 	for entity := range entities {
 		logger.Debugw("submitting entity", "entity", entity)
 
 		if !dryrun {
 			if outputFile != "" {
-				submitToFile(file, entity)
+				if err := submitToFile(file, entity); err != nil {
+					logger.Warnw("error writing to file", "file", outputFile, "err", err)
+					errors += 1
+				}
 			}
 
 			if outputEndpoint != "" {
-				submitToEndpoint(outputEndpoint)
+				if err := submitToEndpoint(outputEndpoint); err != nil {
+					logger.Warnw("error posting to endpoint", "endpoint", outputEndpoint, "err", err)
+					errors += 1
+				}
 			}
 		}
 	}
