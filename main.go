@@ -29,6 +29,10 @@ func run(cmd *cobra.Command, args []string) {
 	logger := util.InitLogger(options.Debug)
 	defer logger.Sync()
 
+	if !options.DryRun && options.OutputFile == "" && options.OutputEndpoint == "" {
+		logger.Fatalw("must specify either \"--outputfile\", \"--outputendpoint\", or \"--dryrun\"")
+	}
+
 	files := make(chan string)
 	entities := make(chan parse.Entity)
 	wg := sync.WaitGroup{}

@@ -10,10 +10,12 @@ import (
 
 type Entity struct {
 	Filepath string            `json:"filepath"`
+	Filename string            `json:"filename"`
 	Data     map[string]string `json:"data"`
 }
 
-func parse(logger util.Logger, matcher *regexp.Regexp, names []string, filename string) *Entity {
+func parse(logger util.Logger, matcher *regexp.Regexp, names []string, path string) *Entity {
+	dir := filepath.Dir(filename)
 	base := filepath.Base(filename)
 	matches := matcher.FindStringSubmatch(base)
 	result := make(map[string]string, len(names)-1)
@@ -36,7 +38,7 @@ func parse(logger util.Logger, matcher *regexp.Regexp, names []string, filename 
 		result[name] = value
 	}
 
-	return &Entity{Filepath: filename, Data: result}
+	return &Entity{Filepath: dir, Filename: base, Data: result}
 }
 
 func Parser(logger util.Logger, files <-chan string, entities chan<- Entity, pattern string) error {
@@ -47,10 +49,10 @@ func Parser(logger util.Logger, files <-chan string, entities chan<- Entity, pat
 	skipped := 0
 	defer func() { logger.Infow("parsing complete", "total", total, "skipped", skipped) }()
 
-	for filepath := range files {
+	for path := range files {
 		total += 1
 
-		if entity := parse(logger, matcher, names, filepath); entity != nil {
+		if entity := parse(logger, matcher, names, path); entity != nil {
 			logger.Debugw("parsed entity", "entity", entity)
 			entities <- *entity
 			continue

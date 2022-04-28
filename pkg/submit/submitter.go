@@ -2,8 +2,10 @@ package submit
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 
+	"github.com/gorilla/websocket"
 	"github.com/hans-m-song/archidex/indexer/pkg/parse"
 	"github.com/hans-m-song/archidex/indexer/pkg/util"
 )
@@ -25,30 +27,47 @@ func submitToFile(file *os.File, entity parse.Entity) error {
 	return nil
 }
 
-func submitToEndpoint(endpoint string) error {
-	return nil
+func submitToEndpoint(logger util.Logger, ws *websocket.Conn, entity parse.Entity) error {
+	return ws.WriteJSON(entity)
 }
 
 func Submitter(logger util.Logger, entities <-chan parse.Entity, outputFile, outputEndpoint string, dryrun bool) error {
-	if outputFile == "" && outputEndpoint == "" {
+	if !dryrun && outputFile == "" && outputEndpoint == "" {
 		logger.Debug("skipping as no outputs were provided")
 		return nil
 	}
 
 	var file *os.File
+	var ws *websocket.Conn
 	var err error
 
 	if outputFile != "" {
 		file, err = os.OpenFile(outputFile, fileFlags, fileMode)
+		if err != nil {
+			logger.Fatalw("failed to open output file", "err", err)
+		}
+
+		logger.Debugw("opened file", "filename", file.Name())
 		defer func() {
 			if err := file.Close(); err != nil {
 				logger.Fatalw("failed to close output file", "err", err)
 			}
 		}()
+	}
 
+	if outputEndpoint != "" {
+		var resp *http.Response
+		ws, resp, err = websocket.DefaultDialer.Dial(outputEndpoint, nil)
 		if err != nil {
-			logger.Fatalw("failed to open output file", "err", err)
+			logger.Fatalw("failed to connect to ws", "resp", resp, "err", err)
 		}
+
+		logger.Debugw("connected to ws", "address", ws.RemoteAddr().String(), "resp", resp)
+		defer func() {
+			if err := ws.Close(); err != nil {
+				logger.Fatalw("failed to close ws", "err", err)
+			}
+		}()
 	}
 
 	errors := 0
@@ -66,7 +85,7 @@ func Submitter(logger util.Logger, entities <-chan parse.Entity, outputFile, out
 			}
 
 			if outputEndpoint != "" {
-				if err := submitToEndpoint(outputEndpoint); err != nil {
+				if err := submitToEndpoint(logger, ws, entity); err != nil {
 					logger.Warnw("error posting to endpoint", "endpoint", outputEndpoint, "err", err)
 					errors += 1
 				}
