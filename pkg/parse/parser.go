@@ -10,35 +10,30 @@ import (
 
 type Entity struct {
 	Filepath string            `json:"filepath"`
-	Filename string            `json:"filename"`
 	Data     map[string]string `json:"data"`
 }
 
 func parse(logger util.Logger, matcher *regexp.Regexp, names []string, path string) *Entity {
-	dir := filepath.Dir(filename)
-	base := filepath.Base(filename)
+	base := filepath.Base(path)
 	matches := matcher.FindStringSubmatch(base)
 	result := make(map[string]string, len(names)-1)
 
 	if len(names) != len(matches) {
-		logger.Warnw("did not match all named fields", "filename", filename, "names", names, "matches", matches)
+		logger.Warnw("did not match all named fields", "path", path, "names", names, "matches", matches)
 		return nil
 	}
 
 	for i, name := range names {
-		if name == filename || name == "" {
+		if name == path || name == "" {
 			continue
 		}
 
-		value := strings.Trim(matches[i], " ")
-		if value == "" {
-			continue
+		if value := strings.Trim(matches[i], " "); value != "" {
+			result[name] = value
 		}
-
-		result[name] = value
 	}
 
-	return &Entity{Filepath: dir, Filename: base, Data: result}
+	return &Entity{Filepath: path, Data: result}
 }
 
 func Parser(logger util.Logger, files <-chan string, entities chan<- Entity, pattern string) error {
